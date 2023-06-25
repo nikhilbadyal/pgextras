@@ -3,7 +3,7 @@
 import argparse
 from typing import Any
 
-from prettytable import PrettyTable
+from tabulate import tabulate
 
 from scripts import PgExtras
 
@@ -73,22 +73,22 @@ def main(args: Any):
             except AttributeError as error:
                 raise SystemExit(1, str(error))
 
-            records = func()
+            results = func()
 
-            try:
-                table = PrettyTable(records[0]._asdict().keys())
-            except IndexError:
-                table = "No records"
-            else:
-                table.align = "l"
+            if not results:
+                print(method)
+                print("No results found.")
+                continue
 
-                for record in records:
-                    table.add_row(record._asdict().values())
+            column_names = results[0]._fields
 
-            print(" ")
-            print(method)
-            print("#" * 79)
-            print(table)
+            # Create a list of rows with incremental 'id' values
+            rows = [[i + 1] + list(row) for i, row in enumerate(results)]
+
+            # Print the table using tabulate
+            print(
+                tabulate(rows, headers=["id"] + list(column_names), tablefmt="presto")
+            )
 
 
 if __name__ == "__main__":
