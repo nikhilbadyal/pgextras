@@ -4,7 +4,6 @@ import argparse
 from typing import Any
 
 from prettytable import PrettyTable
-from tabulate import tabulate
 
 from scripts import PgExtras
 
