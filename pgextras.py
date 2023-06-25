@@ -3,6 +3,7 @@
 import argparse
 from typing import Any
 
+from prettytable import PrettyTable
 from tabulate import tabulate
 
 from scripts import PgExtras
@@ -74,21 +75,22 @@ def main(args: Any):
                 raise SystemExit(1, str(error))
 
             results = func()
-
             if not results:
-                print(method)
-                print("No results found.")
+                print(f"No results found for {method}.")
                 continue
 
+            # Get the column names from the first row of results
             column_names = results[0]._fields
 
-            # Create a list of rows with incremental 'id' values
-            rows = [[i + 1] + list(row) for i, row in enumerate(results)]
+            # Create a PrettyTable instance and set the column names
+            table = PrettyTable(["id"] + list(column_names))
 
-            # Print the table using tabulate
-            print(
-                tabulate(rows, headers=["id"] + list(column_names), tablefmt="presto")
-            )
+            # Add the rows to the table with incremental 'id' values
+            for i, row in enumerate(results, 1):
+                table.add_row([i] + list(row))
+
+            # Print the formatted table
+            print(table)
 
 
 if __name__ == "__main__":
