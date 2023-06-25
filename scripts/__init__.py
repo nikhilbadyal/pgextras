@@ -136,7 +136,6 @@ class PgExtras(object):
         # run end up in the output
         sql = statement.replace("\n", "")
         sql = " ".join(sql.split())
-        print(sql)
         self.cursor.execute(sql)
 
         return self.cursor.fetchall()
