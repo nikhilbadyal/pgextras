@@ -1,75 +1,60 @@
 # -*- coding: utf-8 -*-
-
-"""
-SQL statements are kept here as to not clutter up main file.
-"""
+"""SQL statements are kept here as to not clutter up main file."""
 
 
 VACUUM_STATS = """
     WITH table_opts AS (
-        SELECT
-            pg_class.oid,
-            relname,
-            nspname,
-            array_to_string(reloptions, '') AS relopts
-        FROM pg_class
-            INNER JOIN pg_namespace ns ON relnamespace = ns.oid
+    SELECT
+    pg_class.oid, relname, nspname, array_to_string(reloptions, '') AS relopts
+    FROM
+     pg_class INNER JOIN pg_namespace ns ON relnamespace = ns.oid
     ), vacuum_settings AS (
-        SELECT
-            oid,
-            relname,
-            nspname,
-            CASE
-                WHEN relopts LIKE '%autovacuum_vacuum_threshold%'
-                THEN regexp_replace(
-                    relopts,
-                    '.*autovacuum_vacuum_threshold=([0-9.]+).*',
-                    E'\\\\\\1'
-                )::integer
-                ELSE current_setting('autovacuum_vacuum_threshold')::integer
-            END AS autovacuum_vacuum_threshold,
-            CASE
-                WHEN relopts LIKE '%autovacuum_vacuum_scale_factor%'
-                THEN regexp_replace(
-                    relopts,
-                    '.*autovacuum_vacuum_scale_factor=([0-9.]+).*',
-                    E'\\\\\\1'
-                )::real
-                ELSE current_setting('autovacuum_vacuum_scale_factor')::real
-            END AS autovacuum_vacuum_scale_factor
-        FROM table_opts
+    SELECT
+    oid, relname, nspname,
+    CASE
+      WHEN relopts LIKE '%autovacuum_vacuum_threshold%'
+        THEN substring(relopts,
+            '.*autovacuum_vacuum_threshold=([0-9.]+).*')::integer
+        ELSE current_setting('autovacuum_vacuum_threshold')::integer
+      END AS autovacuum_vacuum_threshold,
+    CASE
+      WHEN relopts LIKE '%autovacuum_vacuum_scale_factor%'
+        THEN substring(relopts,
+            '.*autovacuum_vacuum_scale_factor=([0-9.]+).*')::real
+        ELSE current_setting('autovacuum_vacuum_scale_factor')::real
+      END AS autovacuum_vacuum_scale_factor
+    FROM
+    table_opts
     )
     SELECT
-        vacuum_settings.nspname AS schema,
-        vacuum_settings.relname AS table,
-        to_char(psut.last_vacuum, 'YYYY-MM-DD HH24:MI') AS last_vacuum,
-        to_char(psut.last_autovacuum, 'YYYY-MM-DD HH24:MI') AS last_autovacuum,
-        to_char(pg_class.reltuples, '9G999G999G999') AS rowcount,
-        to_char(psut.n_dead_tup, '9G999G999G999') AS dead_rowcount,
-        to_char(
-            autovacuum_vacuum_threshold + (
-                autovacuum_vacuum_scale_factor::numeric * pg_class.reltuples),
-                '9G999G999G999'
-        ) AS autovacuum_threshold,
-        CASE
-            WHEN autovacuum_vacuum_threshold + (
-                autovacuum_vacuum_scale_factor::numeric * pg_class.reltuples
-            ) < psut.n_dead_tup
-            THEN 'yes'
-        END AS expect_autovacuum
-    FROM pg_stat_user_tables psut
-        INNER JOIN pg_class ON psut.relid = pg_class.oid
-        INNER JOIN vacuum_settings ON pg_class.oid = vacuum_settings.oid
+    vacuum_settings.nspname AS schema,
+    vacuum_settings.relname AS table,
+    to_char(psut.last_vacuum, 'YYYY-MM-DD HH24:MI') AS last_vacuum,
+    to_char(psut.last_autovacuum, 'YYYY-MM-DD HH24:MI') AS last_autovacuum,
+    to_char(pg_class.reltuples, '9G999G999G999') AS rowcount,
+    to_char(psut.n_dead_tup, '9G999G999G999') AS dead_rowcount,
+    to_char(autovacuum_vacuum_threshold
+       + (autovacuum_vacuum_scale_factor::numeric * pg_class.reltuples),
+        '9G999G999G999') AS autovacuum_threshold,
+    CASE
+    WHEN autovacuum_vacuum_threshold +
+        (autovacuum_vacuum_scale_factor::numeric * pg_class.reltuples) <
+            psut.n_dead_tup
+    THEN 'yes'
+    END AS expect_autovacuum
+    FROM
+    pg_stat_user_tables psut INNER JOIN pg_class ON psut.relid = pg_class.oid
+    INNER JOIN vacuum_settings ON pg_class.oid = vacuum_settings.oid
     ORDER BY 1
 """
 
 OUTLIERS = """
     SELECT {query} AS qry,
-        interval '1 millisecond' * total_time AS exec_time,
-        to_char((total_time/sum(total_time) OVER()) * 100,
+        interval '1 millisecond' * {total_time} AS exec_time,
+        to_char(({total_time}/sum({total_time}) OVER()) * 100,
             'FM90D0') || '%' AS
         prop_exec_time,
-        to_char(calls, 'FM999G999G990') AS ncalls,
+        to_char(calls, 'FM999G999G999G990') AS ncalls,
         interval '1 millisecond' * (blk_read_time + blk_write_time)
             AS sync_io_time
     FROM pg_stat_statements
@@ -79,22 +64,23 @@ OUTLIERS = """
         WHERE usename = current_user
         LIMIT 1
     )
-    ORDER BY total_time DESC
+    ORDER BY {total_time} DESC
     LIMIT 10
 """
 
 BLOCKING = """
     SELECT
         bl.pid AS blocked_pid,
-        ka.query AS blocking_statement,
+        ka.{query_column} AS blocking_statement,
         now() - ka.query_start AS blocking_duration,
         kl.pid AS blocking_pid,
-        a.query AS blocked_statement,
+        a.{query_column} AS blocked_statement,
         now() - a.query_start AS blocked_duration
-    FROM pg_catalog.pg_locks bl
-        JOIN pg_catalog.pg_stat_activity a ON bl.pid = a.pid
+    FROM
+        pg_catalog.pg_locks bl
+        JOIN pg_catalog.pg_stat_activity a ON bl.pid = a.{pid_column}
         JOIN pg_catalog.pg_locks kl
-        JOIN pg_catalog.pg_stat_activity ka ON kl.pid = ka.pid
+        JOIN pg_catalog.pg_stat_activity ka ON kl.pid = ka.{pid_column}
             ON bl.transactionid = kl.transactionid AND bl.pid != kl.pid
     WHERE NOT bl.granted
 """
@@ -112,8 +98,8 @@ INDEX_USAGE = """
 """
 
 CALLS = """
-    {query} interval '1 millisecond' * total_time AS exec_time,
-        to_char((total_time/sum(total_time) OVER()) * 100, 'FM90D0') || '%'
+    {select} interval '1 millisecond' * {total_time} AS exec_time,
+        to_char(({total_time}/sum({total_time}) OVER()) * 100, 'FM90D0') || '%'
             AS prop_exec_time,
         to_char(calls, 'FM999G999G990') AS ncalls,
         interval '1 millisecond' * (blk_read_time + blk_write_time)
@@ -130,20 +116,20 @@ CALLS = """
 
 LOCKS = """
     SELECT
-        pg_stat_activity.pid,
+        pg_stat_activity.{pid_column},
         pg_class.relname,
         pg_locks.transactionid,
         pg_locks.granted,
-        substr(pg_stat_activity.query,1,30) AS query_snippet,
+        substr(pg_stat_activity.{query_column},1,30) AS query_snippet,
         age(now(),pg_stat_activity.query_start) AS "age"
     FROM
         pg_stat_activity,
         pg_locks LEFT OUTER JOIN pg_class ON (pg_locks.relation = pg_class.oid)
     WHERE
-        pg_stat_activity.query <> '<insufficient privilege>'
-            AND pg_locks.pid = pg_stat_activity.pid
+        pg_stat_activity.{query_column} <> '<insufficient privilege>'
+            AND pg_locks.pid = pg_stat_activity.{pid_column}
             AND pg_locks.mode = 'ExclusiveLock'
-            AND pg_stat_activity.pid <> pg_backend_pid()
+            AND pg_stat_activity.{pid_column} <> pg_backend_pid()
     ORDER BY query_start
 """
 
@@ -258,7 +244,7 @@ BLOAT = """
         SELECT
             'table' AS type,
             schemaname,
-            tablename AS object_name,
+            tablename || '' AS object_name,
             ROUND(
                 CASE
                     WHEN otta=0
@@ -299,12 +285,13 @@ BLOAT = """
 
 LONG_RUNNING_QUERIES = """
      SELECT
-        pid,
+        {pid_column},
         now() - pg_stat_activity.query_start AS duration,
-        query AS query
+        {query_column} AS query
     FROM pg_stat_activity
     WHERE
-        pg_stat_activity.query <> ''::text
+        pg_stat_activity.{query_column} <> ''::text
+        {idle}
         AND now() - pg_stat_activity.query_start > interval '5 minutes'
     ORDER BY now() - pg_stat_activity.query_start DESC
 """
@@ -397,66 +384,6 @@ TOTAL_INDEX_SIZE = """
         AND c.relkind='i';
 """
 
-MANDELBROT = """
-     WITH RECURSIVE Z(IX, IY, CX, CY, X, Y, I) AS (
-        SELECT
-            IX,
-            IY,
-            X::float,
-            Y::float,
-            X::float,
-            Y::float,
-            0
-        FROM (
-            SELECT
-                -2.2 + 0.031 * i,
-                i
-            FROM generate_series(0,101) AS i
-        ) AS xgen(x,ix),
-        (
-            SELECT
-                -1.5 + 0.031 * i,
-                i
-            FROM generate_series(0,101) AS i
-        ) AS ygen(y,iy)
-        UNION ALL
-        SELECT
-            IX,
-            IY,
-            CX,
-            CY,
-            X * X - Y * Y + CX AS X,
-            Y * X * 2 + CY,
-            I + 1
-         FROM Z
-         WHERE X * X + Y * Y < 16::float
-            AND I < 100
-         )
-        SELECT
-            array_to_string(
-                array_agg(
-                    SUBSTRING(
-                        ' .,,,-----++++%%%%@@@@#### ',
-                        LEAST(
-                            GREATEST(I,1),
-                            27
-                        ),
-                    1)
-                ),
-            '')
-        FROM (
-            SELECT
-                IX,
-                IY,
-                MAX(I) AS I
-            FROM Z
-            GROUP BY IY, IX
-            ORDER BY IY, IX
-        ) AS ZT
-     GROUP BY IY
-     ORDER BY IY
-"""
-
 CACHE_HIT = """
     SELECT
         'index hit rate' AS name,
@@ -482,12 +409,19 @@ TABLE_INDEXES_SIZE = """
     ORDER BY pg_indexes_size(c.oid) DESC;
 """
 
-PG_STATS_NOT_AVAILABLE = """
-    pg_stat_statements extension needs to be installed in the
-    public schema first. This extension is only available on
-    Postgres versions 9.2 or greater. You can install it by
-    adding pg_stat_statements to shared_preload_libraries in
-    postgresql.conf, restarting postgres and then running the
-    following sql statement in your database:
-    CREATE EXTENSION pg_stat_statements;
+PS = """
+    SELECT
+        {pid_column},
+        application_name AS source,
+        age(now(),query_start) AS running_for,
+        {query_column} AS query
+    FROM pg_stat_activity
+    WHERE {query_column} <> '<insufficient privilege>'
+        AND {pid_column} <> pg_backend_pid()
+        {idle}
+    ORDER BY query_start DESC
+"""
+
+VERSION = """
+    SELECT version()
 """
