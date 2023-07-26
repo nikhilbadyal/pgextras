@@ -62,12 +62,16 @@ METHODS = [
         "expected to be triggered.",
     ),
     ("version", "Get the Postgres server version."),
+    ("all", "Run all the methods."),
 ]
 
 
 def main(args: Any):
     """Main function."""
     with PgExtras(dsn=args.dsn) as pg:
+        if args.methods == ["all"]:
+            args.methods = [func[0] for func in METHODS]
+            args.methods.remove("all")
         for method in args.methods:
             try:
                 func = getattr(pg, method)
