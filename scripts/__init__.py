@@ -64,6 +64,16 @@ class PgExtras(object):
         else:
             return "procpid"
 
+    def truncate_query(self, column_name: str) -> str:
+        """Truncate long query."""
+        query = f"""
+            CASE WHEN length({column_name}) < 40
+                THEN {column_name}
+                ELSE substr({column_name}, 0, 38) || '..'
+            END
+        """
+        return query
+
     def pg_stat_statement(self):
         """Some queries require the pg_stat_statement module to be installed.
         http://www.postgresql.org/docs/current/static/pgstatstatements.html.
@@ -234,12 +244,7 @@ class PgExtras(object):
 
         if self.pg_stat_statement():
             if truncate:
-                query = """
-                    CASE WHEN length(query) < 40
-                        THEN query
-                        ELSE substr(query, 0, 38) || '..'
-                    END
-                """
+                query = self.truncate_query(column_name="query")
             else:
                 query = "query"
             if self._is_pg_at_least_thirteen:
