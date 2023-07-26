@@ -114,4 +114,5 @@ if __name__ == "__main__":
     parser.add_argument("-dsn", required=True)
     parser.add_argument("-methods", nargs="+", default=["version"])
     parser.add_argument("-logquery", default=False)
+    parser.add_argument("-truncate", default=True)
     main(parser.parse_args())

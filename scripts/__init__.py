@@ -11,7 +11,8 @@ from . import sql_constants as sql
 
 
 class PgExtras(object):
-    def __init__(self, dsn: str, logquery: bool = False):
+    """Base Class for Utils"""
+    def __init__(self, dsn: str, logquery: bool = False, truncate: bool = True):
         self.dsn = dsn
         self._pg_stat_statement = None
         self._cursor = None
@@ -19,6 +20,7 @@ class PgExtras(object):
         self._is_pg_at_least_nine_two = None
         self._is_pg_at_least_thirteen = None
         self.log_query = logquery
+        self.truncate = truncate
 
     def __enter__(self):
         """The context manager convention is preferred so that if there are
@@ -53,6 +55,18 @@ class PgExtras(object):
             return "current_query"
 
     @property
+    def time_column(self):
+        """PG9.2 changed column names.
+
+        :returns: str
+        """
+
+        if self._is_pg_at_least_thirteen():
+            return "total_exec_time"
+        else:
+            return "total_time"
+
+    @property
     def pid_column(self):
         """PG9.2 changed column names.
 
@@ -66,13 +80,15 @@ class PgExtras(object):
 
     def truncate_query(self, column_name: str) -> str:
         """Truncate long query."""
-        query = f"""
-            CASE WHEN length({column_name}) < 40
-                THEN {column_name}
-                ELSE substr({column_name}, 0, 38) || '..'
-            END
-        """
-        return query
+        if self.truncate:
+            query = f"""
+                CASE WHEN length({column_name}) < 120
+                    THEN {column_name}
+                    ELSE substr({column_name}, 0, 120) || '..'
+                END
+            """
+            return query
+        return column_name
 
     def pg_stat_statement(self):
         """Some queries require the pg_stat_statement module to be installed.
@@ -178,7 +194,7 @@ class PgExtras(object):
 
         return self.execute(sql.INDEX_USAGE)
 
-    def calls(self, truncate=False):
+    def calls(self):
         """Show 10 most frequently called queries. Requires the
         pg_stat_statements Postgres module to be installed.
 
@@ -192,22 +208,10 @@ class PgExtras(object):
         """
 
         if self.pg_stat_statement():
-            if truncate:
-                select = """
-                    SELECT CASE
-                        WHEN length(query) < 40
-                        THEN query
-                        ELSE substr(query, 0, 38) || '..'
-                    END AS qry,
-                """
-            else:
-                select = "SELECT query,"
-            if self._is_pg_at_least_thirteen:
-                total_time = "total_exec_time"
-            else:
-                total_time = "total_time"
-
-            return self.execute(sql.CALLS.format(select=select, total_time=total_time))
+            query = self.truncate_query(column_name=self.query_column)
+            return self.execute(
+                sql.CALLS.format(query=query, total_time=self.time_column)
+            )
         else:
             return [self.get_missing_pg_stat_statement_error()]
 
@@ -228,7 +232,7 @@ class PgExtras(object):
             )
         )
 
-    def outliers(self, truncate=False):
+    def outliers(self):
         """Show 10 queries that have longest execution time in aggregate.
         Requires the pg_stat_statments Postgres module to be installed.
 
@@ -243,15 +247,10 @@ class PgExtras(object):
         """
 
         if self.pg_stat_statement():
-            if truncate:
-                query = self.truncate_query(column_name="query")
-            else:
-                query = "query"
-            if self._is_pg_at_least_thirteen:
-                total_time = "total_exec_time"
-            else:
-                total_time = "total_time"
-            return self.execute(sql.OUTLIERS.format(query=query, total_time=total_time))
+            query = self.truncate_query(column_name=self.query_column)
+            return self.execute(
+                sql.OUTLIERS.format(query=query, total_time=self.time_column)
+            )
         else:
             return [self.get_missing_pg_stat_statement_error()]
 
@@ -420,9 +419,10 @@ class PgExtras(object):
         else:
             idle = "AND current_query <> '<IDLE>'"
 
+        query_column = self.truncate_query(column_name=self.query_column)
         return self.execute(
             sql.PS.format(
-                pid_column=self.pid_column, query_column=self.query_column, idle=idle
+                pid_column=self.pid_column, query_column=query_column, idle=idle
             )
         )
 

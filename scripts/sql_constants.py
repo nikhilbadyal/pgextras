@@ -98,7 +98,7 @@ INDEX_USAGE = """
 """
 
 CALLS = """
-    {select} interval '1 millisecond' * {total_time} AS exec_time,
+    select {query}, interval '1 millisecond' * {total_time} AS exec_time,
         to_char(({total_time}/sum({total_time}) OVER()) * 100, 'FM90D0') || '%'
             AS prop_exec_time,
         to_char(calls, 'FM999G999G990') AS ncalls,
