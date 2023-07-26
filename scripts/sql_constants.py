@@ -259,7 +259,7 @@ BLOAT = """
                          table_bloat.relpages-otta)::bigint)::bigint
                  END AS raw_waste
          FROM table_bloat
-         WHERE (bs * (table_bloat.relpages - otta)::bigint) >= (1024 * 1024)  -- Filter where raw waste is at least 1 MB
+         WHERE (bs * (table_bloat.relpages - otta)::bigint) >= (1024 * 1024)
          UNION
          SELECT
              'index' AS type,
@@ -278,7 +278,7 @@ BLOAT = """
                  ELSE (bs*(ipages-iotta))::bigint
                  END AS raw_waste
          FROM index_bloat
-         WHERE (bs * (ipages - iotta)) >= (1024 * 1024)  -- Filter where raw waste is at least 1 MB
+         WHERE (bs * (ipages - iotta)) >= (1024 * 1024)
      ) bloat_summary
     ORDER BY
     raw_waste DESC,
