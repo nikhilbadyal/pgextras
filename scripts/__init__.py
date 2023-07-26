@@ -5,6 +5,7 @@ from typing import List
 
 import psycopg2
 import psycopg2.extras
+from loguru import logger
 
 from . import sql_constants as sql
 

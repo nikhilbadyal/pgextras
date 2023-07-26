@@ -3,6 +3,7 @@
 import argparse
 from typing import Any
 
+from loguru import logger
 from prettytable import PrettyTable
 
 from scripts import PgExtras
@@ -75,7 +76,7 @@ def main(args: Any):
 
             results = func()
             if not results:
-                print(f"No results found for {method}.")
+                logger.info(f"No results found for {method}.")
                 continue
 
             # Get the column names from the first row of results
@@ -87,6 +88,8 @@ def main(args: Any):
             # Add the rows to the table with incremental 'id' values
             for i, row in enumerate(results, 1):
                 table.add_row([i] + list(row))
+
+            logger.info(method)
 
             # Print the formatted table
             print(table)
