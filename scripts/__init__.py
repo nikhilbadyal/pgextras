@@ -11,13 +11,14 @@ from . import sql_constants as sql
 
 
 class PgExtras(object):
-    def __init__(self, dsn: str):
+    def __init__(self, dsn: str, logquery: bool = False):
         self.dsn = dsn
         self._pg_stat_statement = None
         self._cursor = None
         self._conn = None
         self._is_pg_at_least_nine_two = None
         self._is_pg_at_least_thirteen = None
+        self.log_query = logquery
 
     def __enter__(self):
         """The context manager convention is preferred so that if there are
@@ -137,6 +138,8 @@ class PgExtras(object):
         # run end up in the output
         sql = statement.replace("\n", "")
         sql = " ".join(sql.split())
+        if self.log_query:
+            logger.debug(sql)
         self.cursor.execute(sql)
 
         return self.cursor.fetchall()

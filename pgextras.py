@@ -68,7 +68,7 @@ METHODS = [
 
 def main(args: Any):
     """Main function."""
-    with PgExtras(dsn=args.dsn) as pg:
+    with PgExtras(dsn=args.dsn, logquery=args.logquery) as pg:
         if args.methods == ["all"]:
             args.methods = [func[0] for func in METHODS]
             args.methods.remove("all")
@@ -113,4 +113,5 @@ if __name__ == "__main__":
 
     parser.add_argument("-dsn", required=True)
     parser.add_argument("-methods", nargs="+", default=["version"])
+    parser.add_argument("-logquery", default=False)
     main(parser.parse_args())
