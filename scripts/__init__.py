@@ -61,7 +61,7 @@ class PgExtras(object):
         :returns: str
         """
 
-        if self._is_pg_at_least_thirteen():
+        if self._is_pg_at_least_thirteen:
             return "total_exec_time"
         else:
             return "total_time"
