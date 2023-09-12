@@ -1,7 +1,8 @@
-# -*- coding: utf-8 -*-
+"""Entrypoint."""
 import re
 from collections import namedtuple
-from typing import List
+from types import TracebackType
+from typing import TYPE_CHECKING, Any, List, Optional, Self, Tuple, Type, Union
 
 import psycopg2
 import psycopg2.extras
@@ -9,97 +10,98 @@ from loguru import logger
 
 from . import sql_constants as sql
 
+if TYPE_CHECKING:
+    from psycopg2._psycopg import connection, cursor
+
+postgres_9 = 9.2
+postgres_13 = 13.0
+
 
 class PgExtras(object):
-    """Base Class for Utils"""
-    def __init__(self, dsn: str, logquery: bool = False, truncate: bool = True):
+    """Base Class for Utils."""
+
+    def __init__(self: Self, dsn: str, logquery: bool = False, truncate: bool = True) -> None:  # noqa: FBT001,FBT002
         self.dsn = dsn
-        self._pg_stat_statement = None
-        self._cursor = None
-        self._conn = None
-        self._is_pg_at_least_nine_two = None
-        self._is_pg_at_least_thirteen = None
+        self._pg_stat_statement: Union[None, bool] = None
+        self._cursor: Union[cursor, None] = None
+        self._conn: Union[connection, None] = None
+        self._is_pg_at_least_nine_two: Union[None, bool] = None
+        self._is_pg_at_least_thirteen: Union[None, bool] = None
         self.log_query = logquery
         self.truncate = truncate
 
-    def __enter__(self):
-        """The context manager convention is preferred so that if there are
-        ever any exceptions the database cursor/connection will always be
-        closed."""
+    def __enter__(self: Self) -> Self:
+        """To use with clause."""
         return self
 
-    def __exit__(self, type, value, trace):
+    def __exit__(
+        self: Self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        exc_traceback: Optional[TracebackType],
+    ) -> None:
+        """Exit from with clause."""
         self.close_db_connection()
 
     @property
-    def cursor(self):
+    def cursor(self: Self) -> Any:
+        """Return the cursor."""
         if self._cursor is None:
-            self._conn = psycopg2.connect(
-                self.dsn, cursor_factory=psycopg2.extras.NamedTupleCursor
-            )
+            self._conn = psycopg2.connect(self.dsn, cursor_factory=psycopg2.extras.NamedTupleCursor)
 
             self._cursor = self._conn.cursor()
 
         return self._cursor
 
     @property
-    def query_column(self):
+    def query_column(self: Self) -> str:
         """PG9.2 changed column names.
 
         :returns: str
         """
-
         if self.is_pg_at_least_nine_two():
             return "query"
-        else:
-            return "current_query"
+        return "current_query"
 
     @property
-    def time_column(self):
+    def time_column(self: Self) -> str:
         """PG9.2 changed column names.
 
         :returns: str
         """
-
         if self._is_pg_at_least_thirteen:
             return "total_exec_time"
-        else:
-            return "total_time"
+        return "total_time"
 
     @property
-    def pid_column(self):
+    def pid_column(self: Self) -> str:
         """PG9.2 changed column names.
 
         :returns: str
         """
-
         if self.is_pg_at_least_nine_two():
             return "pid"
-        else:
-            return "procpid"
+        return "procpid"
 
-    def truncate_query(self, column_name: str) -> str:
+    def truncate_query(self: Self, column_name: str) -> str:
         """Truncate long query."""
         if self.truncate:
-            query = f"""
+            return f"""
                 CASE WHEN length({column_name}) < 120
                     THEN {column_name}
                     ELSE substr({column_name}, 0, 120) || '..'
                 END
             """
-            return query
         return column_name
 
-    def pg_stat_statement(self):
+    def pg_stat_statement(self: Self) -> bool:
         """Some queries require the pg_stat_statement module to be installed.
-        http://www.postgresql.org/docs/current/static/pgstatstatements.html.
 
         :returns: boolean
         """
-
         if self._pg_stat_statement is None:
             results = self.execute(sql.PG_STAT_STATEMENT)
-            is_available = results[0].available
+            is_available = results[0].available  # type: ignore[attr-defined]
 
             if is_available:
                 self._pg_stat_statement = True
@@ -108,8 +110,9 @@ class PgExtras(object):
 
         return self._pg_stat_statement
 
-    def get_missing_pg_stat_statement_error(self):
-        Record = namedtuple("Record", "error")
+    def get_missing_pg_stat_statement_error(self: Self) -> Any:
+        """Missing pg stats statement."""
+        Record = namedtuple("Record", "error")  # noqa: PYI024
         error = """
             pg_stat_statements extension needs to be installed in the
             public schema first. This extension is only available on
@@ -122,44 +125,42 @@ class PgExtras(object):
 
         return Record(error)
 
-    def is_pg_at_least_nine_two(self) -> bool:
-        """Some queries have different syntax depending what version of
-        postgres we are querying against.
+    def is_pg_at_least_nine_two(self: Self) -> bool:
+        """Some queries have different syntax depending what version of postgres we are querying against.
 
         :returns: boolean
         """
-
         if self._is_pg_at_least_nine_two is None:
             results = self.version()
             regex = re.compile(r"PostgreSQL (\d+(\.\d+){0,2}) on")
-            matches = regex.match(results[0].version)
-            version = matches.groups()[0]
+            matches = regex.match(results[0].version)  # type: ignore[attr-defined]
+            version = matches.groups()[0]  # type: ignore[union-attr]
 
-            if float(version) > 9.2:
+            if float(version) > postgres_9:
                 self._is_pg_at_least_nine_two = True
             else:
                 self._is_pg_at_least_nine_two = False
-            if float(version) >= 13.0:
+            if float(version) >= postgres_13:
                 self._is_pg_at_least_thirteen = True
             else:
                 self._is_pg_at_least_thirteen = False
 
         return self._is_pg_at_least_nine_two
 
-    def close_db_connection(self):
+    def close_db_connection(self: Self) -> None:
+        """Close database connection."""
         if self._cursor is not None:
-            self._cursor.close()
+            self._cursor.close()  # type: ignore[no-untyped-call]
 
         if self._conn is not None:
             self._conn.close()
 
-    def execute(self, statement) -> List[str]:
+    def execute(self: Self, statement: str) -> List[Tuple[Any, ...]]:
         """Execute the given sql statement.
 
         :param statement: sql statement to run
         :returns: list
         """
-
         # Make the sql statement easier to read in case some of the queries we
         # run end up in the output
         sql = statement.replace("\n", "")
@@ -167,74 +168,52 @@ class PgExtras(object):
         if self.log_query:
             logger.debug(sql)
         self.cursor.execute(sql)
+        return self.cursor.fetchall()  # type: ignore[no-any-return]
 
-        return self.cursor.fetchall()
+    def cache_hit(self: Self) -> List[Tuple[Any, ...]]:
+        """Calculates your cache hit rate (effective databases are at 99% and up).
 
-    def cache_hit(self):
-        """Calculates your cache hit rate (effective databases are at 99% and
-        up).
-
-        Record(     name='index hit rate',
-        ratio=Decimal('0.99994503346970922117') )
+        Record(     name='index hit rate', ratio=Decimal('0.99994503346970922117') )
 
         :returns: list of Records
         """
-
         return self.execute(sql.CACHE_HIT)
 
-    def index_usage(self):
-        """Calculates your index hit rate (effective databases are at 99% and
-        up).
+    def index_usage(self: Self) -> List[Tuple[Any, ...]]:
+        """Calculates your index hit rate (effective databases are at 99% and up).
 
-        Record(     relname='pgbench_history',
-        percent_of_times_index_used=None,     rows_in_table=249976 )
+        Record(     relname='pgbench_history', percent_of_times_index_used=None,     rows_in_table=249976 )
 
         :returns: list of Records
         """
-
         return self.execute(sql.INDEX_USAGE)
 
-    def calls(self):
-        """Show 10 most frequently called queries. Requires the
-        pg_stat_statements Postgres module to be installed.
+    def calls(self: Self) -> List[Tuple[Any, ...]]:
+        """Show 10 most frequently called queries. Requires the pg_stat_statements Postgres module to be installed.
 
-        Record(     query='BEGIN;',     exec_time=datetime.timedelta(0,
-        0, 288174),     prop_exec_time='0.0%',     ncalls='845590',
-        sync_io_time=datetime.timedelta(0) )
+        Record(     query='BEGIN;',     exec_time=datetime.timedelta(0, 0, 288174),     prop_exec_time='0.0%',
+        ncalls='845590', sync_io_time=datetime.timedelta(0) )
 
-        :param truncate: trim the Record.query output if greater than 40
-            chars
+        :param truncate: trim the Record.query output if greater than 40 chars
         :returns: list of Records
         """
-
         if self.pg_stat_statement():
             query = self.truncate_query(column_name=self.query_column)
-            return self.execute(
-                sql.CALLS.format(query=query, total_time=self.time_column)
-            )
-        else:
-            return [self.get_missing_pg_stat_statement_error()]
+            return self.execute(sql.CALLS.format(query=query, total_time=self.time_column))
+        return [self.get_missing_pg_stat_statement_error()]
 
-    def blocking(self):
-        """Display queries holding locks other queries are waiting to be
-        released.
+    def blocking(self: Self) -> List[Tuple[Any, ...]]:
+        """Display queries holding locks other queries are waiting to be released.
 
-        Record(     pid=40821,     source='',
-        running_for=datetime.timedelta(0, 0, 2857),     waiting=False,
+        Record(     pid=40821,     source='', running_for=datetime.timedelta(0, 0, 2857),     waiting=False,
         query='SELECT pg_sleep(10);' )
 
         :returns: list of Records
         """
+        return self.execute(sql.BLOCKING.format(query_column=self.query_column, pid_column=self.pid_column))
 
-        return self.execute(
-            sql.BLOCKING.format(
-                query_column=self.query_column, pid_column=self.pid_column
-            )
-        )
-
-    def outliers(self):
-        """Show 10 queries that have longest execution time in aggregate.
-        Requires the pg_stat_statments Postgres module to be installed.
+    def outliers(self: Self) -> List[Tuple[Any, ...]]:
+        """Show 10 queries that have longest execution time in aggregate. Requires the pg_stat_statments.
 
         Record(     qry='UPDATE pgbench_tellers SET tbalance = tbalance
         + ?;',     exec_time=datetime.timedelta(0, 19944, 993099),
@@ -245,30 +224,23 @@ class PgExtras(object):
             chars
         :returns: list of Records
         """
-
         if self.pg_stat_statement():
             query = self.truncate_query(column_name=self.query_column)
-            return self.execute(
-                sql.OUTLIERS.format(query=query, total_time=self.time_column)
-            )
-        else:
-            return [self.get_missing_pg_stat_statement_error()]
+            return self.execute(sql.OUTLIERS.format(query=query, total_time=self.time_column))
+        return [self.get_missing_pg_stat_statement_error()]
 
-    def vacuum_stats(self):
-        """Show dead rows and whether an automatic vacuum is expected to be
-        triggered.
+    def vacuum_stats(self: Self) -> List[Tuple[Any, ...]]:
+        """Show dead rows and whether an automatic vacuum is expected to be triggered.
 
-        Record(     schema='public',     table='pgbench_tellers',
-        last_vacuum='2014-04-29 14:45',     last_autovacuum='2014-04-29
-        14:45',     rowcount='10',     dead_rowcount='0',
-        autovacuum_threshold='52',     expect_autovacuum=None )
+        Record(     schema='public',     table='pgbench_tellers', last_vacuum='2014-04-29 14:45',
+        last_autovacuum='2014-04-29 14:45',     rowcount='10',     dead_rowcount='0', autovacuum_threshold='52',
+        expect_autovacuum=None )
 
         :returns: list of Records
         """
-
         return self.execute(sql.VACUUM_STATS)
 
-    def bloat(self):
+    def bloat(self: Self) -> List[Tuple[Any, ...]]:
         """Table and index bloat in your database ordered by most wasteful.
 
         Record(
@@ -281,44 +253,36 @@ class PgExtras(object):
 
         :returns: list of Records
         """
-
         return self.execute(sql.BLOAT)
 
-    def long_running_queries(self):
+    def long_running_queries(self: Self) -> List[Tuple[Any, ...]]:
         """Show all queries longer than five minutes by descending duration.
 
-        Record(     pid=19578,     duration=datetime.timedelta(0, 19944,
-        993099),     query='SELECT * FROM students' )
+        Record(     pid=19578,     duration=datetime.timedelta(0, 19944, 993099),     query='SELECT * FROM students' )
 
         :returns: list of Records
         """
-
-        if self.is_pg_at_least_nine_two():
-            idle = "AND state <> 'idle'"
-        else:
-            idle = "AND current_query <> '<IDLE>'"
+        idle = "AND state <> 'idle'" if self.is_pg_at_least_nine_two() else "AND current_query <> '<IDLE>'"
 
         return self.execute(
-            sql.LONG_RUNNING_QUERIES.format(
-                pid_column=self.pid_column, query_column=self.query_column, idle=idle
-            )
+            sql.LONG_RUNNING_QUERIES.format(pid_column=self.pid_column, query_column=self.query_column, idle=idle)
         )
 
-    def seq_scans(self):
+    def seq_scans(self: Self) -> List[Tuple[Any, ...]]:
         """Show the count of sequential scans by table descending by order.
 
         Record(     name='pgbench_branches',     count=237 )
 
         :returns: list of Records
         """
-
         return self.execute(sql.SEQ_SCANS)
 
-    def unused_indexes(self):
-        """Show unused and almost unused indexes, ordered by their size
-        relative to the number of index scans. Exclude indexes of very small
-        tables (less than 5 pages), where the planner will almost invariably
-        select a sequential scan, but may not in the future as the table grows.
+    def unused_indexes(self: Self) -> List[Tuple[Any, ...]]:
+        """Show unused and almost unused indexes, ordered by their size.
+
+        relative to the number of index scans. Exclude
+        indexes of very small tables (less than 5 pages), where the planner will almost invariably select a sequential
+        scan, but may not in the future as the table grows.
 
         Record(
             table='public.grade_levels',
@@ -329,57 +293,50 @@ class PgExtras(object):
 
         :returns: list of Records
         """
-
         return self.execute(sql.UNUSED_INDEXES)
 
-    def total_table_size(self):
+    def total_table_size(self: Self) -> List[Tuple[Any, ...]]:
         """Show the size of the tables (including indexes), descending by size.
 
         Record(     name='pgbench_accounts',     size='15 MB' )
 
         :returns: list of Records
         """
-
         return self.execute(sql.TOTAL_TABLE_SIZE)
 
-    def total_indexes_size(self):
-        """Show the total size of all the indexes on each table, descending by
-        size.
+    def total_indexes_size(self: Self) -> List[Tuple[Any, ...]]:
+        """Show the total size of all the indexes on each table, descending by size.
 
         Record(     table='pgbench_accounts',     index_size='2208 kB' )
 
         :returns: list of Records
         """
-
         return self.execute(sql.TOTAL_INDEXES_SIZE)
 
-    def table_size(self):
+    def table_size(self: Self) -> List[Tuple[Any, ...]]:
         """Show the size of the tables (excluding indexes), descending by size.
 
         :returns: list
         """
-
         return self.execute(sql.TABLE_SIZE)
 
-    def index_size(self):
+    def index_size(self: Self) -> List[Tuple[Any, ...]]:
         """Show the size of indexes, descending by size.
 
         :returns: list
         """
-
         return self.execute(sql.INDEX_SIZE)
 
-    def total_index_size(self):
+    def total_index_size(self: Self) -> List[Tuple[Any, ...]]:
         """Show the total size of all indexes.
 
         Record(     size='2240 kB' )
 
         :returns: list of Records
         """
-
         return self.execute(sql.TOTAL_INDEX_SIZE)
 
-    def locks(self):
+    def locks(self: Self) -> List[Tuple[Any, ...]]:
         """Display queries with active locks.
 
         Record(     procpid=31776,     relname=None,
@@ -388,51 +345,35 @@ class PgExtras(object):
 
         :returns: list of Records
         """
+        return self.execute(sql.LOCKS.format(pid_column=self.pid_column, query_column=self.query_column))
 
-        return self.execute(
-            sql.LOCKS.format(pid_column=self.pid_column, query_column=self.query_column)
-        )
-
-    def table_indexes_size(self):
-        """Show the total size of all the indexes on each table, descending by
-        size.
+    def table_indexes_size(self: Self) -> List[Tuple[Any, ...]]:
+        """Show the total size of all the indexes on each table, descending by size.
 
         Record(     table='pgbench_accounts',     index_size='2208 kB' )
 
         :returns: list of Records
         """
-
         return self.execute(sql.TABLE_INDEXES_SIZE)
 
-    def ps(self):
+    def ps(self: Self) -> List[Tuple[Any, ...]]:
         """View active queries with execution time.
 
-        Record(     pid=28023,     source='pgbench',
-        running_for=datetime.timedelta(0, 0, 288174),     waiting=0,
+        Record(     pid=28023,     source='pgbench', running_for=datetime.timedelta(0, 0, 288174),     waiting=0,
         query='UPDATE pgbench_accounts SET abalance = abalance + 423;' )
 
         :returns: list of Records
         """
-
-        if self.is_pg_at_least_nine_two():
-            idle = "AND state <> 'idle'"
-        else:
-            idle = "AND current_query <> '<IDLE>'"
+        idle = "AND state <> 'idle'" if self.is_pg_at_least_nine_two() else "AND current_query <> '<IDLE>'"
 
         query_column = self.truncate_query(column_name=self.query_column)
-        return self.execute(
-            sql.PS.format(
-                pid_column=self.pid_column, query_column=query_column, idle=idle
-            )
-        )
+        return self.execute(sql.PS.format(pid_column=self.pid_column, query_column=query_column, idle=idle))
 
-    def version(self):
+    def version(self: Self) -> List[Tuple[Any, ...]]:
         """Get the Postgres server version.
 
-        Record(     version='PostgreSQL 9.3.3 on x86_64-apple-
-        darwin13.0.0' )
+        Record(     version='PostgreSQL 9.3.3 on x86_64-apple- darwin13.0.0' )
 
         :returns: list of Records
         """
-
         return self.execute(sql.VERSION)

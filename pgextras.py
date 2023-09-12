@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python #noqa: D100
 import argparse
 from typing import Any
 
@@ -9,64 +8,61 @@ from prettytable import PrettyTable
 from scripts import PgExtras
 
 METHODS = [
-    ("bloat", "Table and index bloat in your database ordered by most " "wasteful."),
-    ("blocking", "Queries holding locks other queryes are qaiting to be " "releases"),
+    ("bloat", "Table and index bloat in your database ordered by most wasteful."),
+    ("blocking", "Queries holding locks other queryes are qaiting to be releases"),
     (
         "cache_hit",
-        "Calculates your cache hit rate (effective databases are at " "99% and up).",
+        "Calculates your cache hit rate (effective databases are at 99% and up).",
     ),
     (
         "calls",
-        "Show 10 most frequently called queries. Requires the " "pg_stat_statements.",
+        "Show 10 most frequently called queries. Requires the pg_stat_statements.",
     ),
     (
         "index_usage",
-        "Calculates your index hit rate (effective databases are " "at 99% and up).",
+        "Calculates your index hit rate (effective databases are at 99% and up).",
     ),
     ("locks", "Display queries with active locks."),
     (
         "long_running_queries",
-        "Show all queries longer than five minutes by " "descending duration.",
+        "Show all queries longer than five minutes by descending duration.",
     ),
     (
         "outliers",
-        "Show 10 queries that have longest execution time in "
-        "aggregate. Requires the pg_stat_statments.",
+        "Show 10 queries that have longest execution time in aggregate. Requires the pg_stat_statments.",
     ),
     ("ps", "View active queries with execution time."),
     (
         "seq_scans",
-        "Show the count of sequential scans by table descending by " "order.",
+        "Show the count of sequential scans by table descending by order.",
     ),
     ("total_index_size", "Show the total size of all indexes."),
     (
         "total_indexes_size",
-        "Show the total size of all the indexes on each" "table, descending by size.",
+        "Show the total size of all the indexes on eachtable, descending by size.",
     ),
     (
         "table_size",
-        "Show the size of the tables (excluding indexes)," "descending by size.",
+        "Show the size of the tables (excluding indexes),descending by size.",
     ),
     (
         "total_table_size",
-        "Show the size of the tables (including indexes), " "descending by size.",
+        "Show the size of the tables (including indexes), descending by size.",
     ),
     (
         "unused_indexes",
-        "Show unused and almost unused indexes, ordered by "
-        "their size relative to the number of index scans.",
+        "Show unused and almost unused indexes, ordered by their size relative to the number of index scans.",
     ),
     (
         "vacuum_stats",
-        "Show dead rows and whether an automatic vacuum is "
-        "expected to be triggered.",
+        "Show dead rows and whether an automatic vacuum is expected to be triggered.",
     ),
     ("version", "Get the Postgres server version."),
     ("all", "Run all the methods."),
 ]
 
 
-def main(args: Any):
+def main(args: Any) -> None:
     """Main function."""
     with PgExtras(dsn=args.dsn, logquery=args.logquery) as pg:
         if args.methods == ["all"]:
@@ -76,7 +72,7 @@ def main(args: Any):
             try:
                 func = getattr(pg, method)
             except AttributeError as error:
-                raise SystemExit(1, str(error))
+                raise SystemExit(1, str(error)) from error
 
             results = func()
             if not results:
@@ -87,11 +83,11 @@ def main(args: Any):
             column_names = results[0]._fields
 
             # Create a PrettyTable instance and set the column names
-            table = PrettyTable(["id"] + list(column_names))
+            table = PrettyTable(["id", *list(column_names)])
 
             # Add the rows to the table with incremental 'id' values
             for i, row in enumerate(results, 1):
-                table.add_row([i] + list(row))
+                table.add_row([i, *list(row)])
 
             logger.info(method)
 
@@ -105,10 +101,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="CLI for PgExtras",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="\n".join(
-            "{}: {} {}".format(k, " " * (left_column_length - len(k)), v)
-            for k, v in METHODS
-        ),
+        epilog="\n".join("{}: {} {}".format(k, " " * (left_column_length - len(k)), v) for k, v in METHODS),
     )
 
     parser.add_argument("-dsn", required=True)
