@@ -7,17 +7,18 @@ from typing import TYPE_CHECKING, Any, List, Optional, Self, Tuple, Type, Union
 import psycopg2
 import psycopg2.extras
 from loguru import logger
+from packaging.version import parse as parse_version
 
 from . import sql_constants as sql
 
 if TYPE_CHECKING:
     from psycopg2._psycopg import connection, cursor
 
-postgres_9 = 9.2
-postgres_13 = 13.0
+postgres_9 = "9.2.0"
+postgres_13 = "13"
 
 
-class PgExtras(object):
+class PgExtras:
     """Base Class for Utils."""
 
     def __init__(self: Self, dsn: str, logquery: bool = False, truncate: bool = True) -> None:  # noqa: FBT001,FBT002
@@ -69,7 +70,7 @@ class PgExtras(object):
 
         :returns: str
         """
-        if self._is_pg_at_least_thirteen:
+        if self.is_pg_at_least_thirteen():
             return "total_exec_time"
         return "total_time"
 
@@ -132,20 +133,34 @@ class PgExtras(object):
         """
         if self._is_pg_at_least_nine_two is None:
             results = self.version()
-            regex = re.compile(r"PostgreSQL (\d+(\.\d+){0,2}) on")
+            regex = re.compile(r"PostgreSQL (\d+(\.\d+)+) on")
             matches = regex.match(results[0].version)  # type: ignore[attr-defined]
             version = matches.groups()[0]  # type: ignore[union-attr]
 
-            if float(version) > postgres_9:
+            if parse_version(version) > parse_version(postgres_9):
                 self._is_pg_at_least_nine_two = True
             else:
                 self._is_pg_at_least_nine_two = False
-            if float(version) >= postgres_13:
+
+        return self._is_pg_at_least_nine_two
+
+    def is_pg_at_least_thirteen(self: Self) -> bool:
+        """Some queries have different syntax depending what version of postgres we are querying against.
+
+        :returns: boolean
+        """
+        if self._is_pg_at_least_thirteen is None:
+            results = self.version()
+            regex = re.compile(r"PostgreSQL (\d+(\.\d+)+) on")
+            matches = regex.match(results[0].version)  # type: ignore[attr-defined]
+            version = matches.groups()[0]  # type: ignore[union-attr]
+
+            if parse_version(version) >= parse_version("13"):
                 self._is_pg_at_least_thirteen = True
             else:
                 self._is_pg_at_least_thirteen = False
 
-        return self._is_pg_at_least_nine_two
+        return self._is_pg_at_least_thirteen
 
     def close_db_connection(self: Self) -> None:
         """Close database connection."""

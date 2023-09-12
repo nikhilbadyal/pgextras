@@ -64,6 +64,7 @@ METHODS = [
 
 def main(args: Any) -> None:
     """Main function."""
+    print(type(args))
     with PgExtras(dsn=args.dsn, logquery=args.logquery) as pg:
         if args.methods == ["all"]:
             args.methods = [func[0] for func in METHODS]
