@@ -2,7 +2,7 @@
 import re
 from collections import namedtuple
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, List, Optional, Self, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Self
 
 import psycopg2
 import psycopg2.extras
@@ -23,11 +23,11 @@ class PgExtras:
 
     def __init__(self: Self, dsn: str, logquery: bool = False, truncate: bool = True) -> None:  # noqa: FBT001,FBT002
         self.dsn = dsn
-        self._pg_stat_statement: Union[None, bool] = None
-        self._cursor: Union[cursor, None] = None
-        self._conn: Union[connection, None] = None
-        self._is_pg_at_least_nine_two: Union[None, bool] = None
-        self._is_pg_at_least_thirteen: Union[None, bool] = None
+        self._pg_stat_statement: None | bool = None
+        self._cursor: cursor | None = None
+        self._conn: connection | None = None
+        self._is_pg_at_least_nine_two: None | bool = None
+        self._is_pg_at_least_thirteen: None | bool = None
         self.log_query = logquery
         self.truncate = truncate
 
@@ -37,9 +37,9 @@ class PgExtras:
 
     def __exit__(
         self: Self,
-        exc_type: Optional[Type[BaseException]],
-        exc_value: Optional[BaseException],
-        exc_traceback: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
     ) -> None:
         """Exit from with clause."""
         self.close_db_connection()
@@ -170,7 +170,7 @@ class PgExtras:
         if self._conn is not None:
             self._conn.close()
 
-    def execute(self: Self, statement: str) -> List[Tuple[Any, ...]]:
+    def execute(self: Self, statement: str) -> list[tuple[Any, ...]]:
         """Execute the given sql statement.
 
         :param statement: sql statement to run
@@ -185,7 +185,7 @@ class PgExtras:
         self.cursor.execute(sql)
         return self.cursor.fetchall()  # type: ignore[no-any-return]
 
-    def cache_hit(self: Self) -> List[Tuple[Any, ...]]:
+    def cache_hit(self: Self) -> list[tuple[Any, ...]]:
         """Calculates your cache hit rate (effective databases are at 99% and up).
 
         Record(     name='index hit rate', ratio=Decimal('0.99994503346970922117') )
@@ -194,7 +194,7 @@ class PgExtras:
         """
         return self.execute(sql.CACHE_HIT)
 
-    def index_usage(self: Self) -> List[Tuple[Any, ...]]:
+    def index_usage(self: Self) -> list[tuple[Any, ...]]:
         """Calculates your index hit rate (effective databases are at 99% and up).
 
         Record(     relname='pgbench_history', percent_of_times_index_used=None,     rows_in_table=249976 )
@@ -203,7 +203,7 @@ class PgExtras:
         """
         return self.execute(sql.INDEX_USAGE)
 
-    def calls(self: Self) -> List[Tuple[Any, ...]]:
+    def calls(self: Self) -> list[tuple[Any, ...]]:
         """Show 10 most frequently called queries. Requires the pg_stat_statements Postgres module to be installed.
 
         Record(     query='BEGIN;',     exec_time=datetime.timedelta(0, 0, 288174),     prop_exec_time='0.0%',
@@ -217,7 +217,7 @@ class PgExtras:
             return self.execute(sql.CALLS.format(query=query, total_time=self.time_column))
         return [self.get_missing_pg_stat_statement_error()]
 
-    def blocking(self: Self) -> List[Tuple[Any, ...]]:
+    def blocking(self: Self) -> list[tuple[Any, ...]]:
         """Display queries holding locks other queries are waiting to be released.
 
         Record(     pid=40821,     source='', running_for=datetime.timedelta(0, 0, 2857),     waiting=False,
@@ -227,7 +227,7 @@ class PgExtras:
         """
         return self.execute(sql.BLOCKING.format(query_column=self.query_column, pid_column=self.pid_column))
 
-    def outliers(self: Self) -> List[Tuple[Any, ...]]:
+    def outliers(self: Self) -> list[tuple[Any, ...]]:
         """Show 10 queries that have longest execution time in aggregate. Requires the pg_stat_statments.
 
         Record(     qry='UPDATE pgbench_tellers SET tbalance = tbalance
@@ -244,7 +244,7 @@ class PgExtras:
             return self.execute(sql.OUTLIERS.format(query=query, total_time=self.time_column))
         return [self.get_missing_pg_stat_statement_error()]
 
-    def vacuum_stats(self: Self) -> List[Tuple[Any, ...]]:
+    def vacuum_stats(self: Self) -> list[tuple[Any, ...]]:
         """Show dead rows and whether an automatic vacuum is expected to be triggered.
 
         Record(     schema='public',     table='pgbench_tellers', last_vacuum='2014-04-29 14:45',
@@ -255,7 +255,7 @@ class PgExtras:
         """
         return self.execute(sql.VACUUM_STATS)
 
-    def bloat(self: Self) -> List[Tuple[Any, ...]]:
+    def bloat(self: Self) -> list[tuple[Any, ...]]:
         """Table and index bloat in your database ordered by most wasteful.
 
         Record(
@@ -270,7 +270,7 @@ class PgExtras:
         """
         return self.execute(sql.BLOAT)
 
-    def long_running_queries(self: Self) -> List[Tuple[Any, ...]]:
+    def long_running_queries(self: Self) -> list[tuple[Any, ...]]:
         """Show all queries longer than five minutes by descending duration.
 
         Record(     pid=19578,     duration=datetime.timedelta(0, 19944, 993099),     query='SELECT * FROM students' )
@@ -280,10 +280,10 @@ class PgExtras:
         idle = "AND state <> 'idle'" if self.is_pg_at_least_nine_two() else "AND current_query <> '<IDLE>'"
 
         return self.execute(
-            sql.LONG_RUNNING_QUERIES.format(pid_column=self.pid_column, query_column=self.query_column, idle=idle)
+            sql.LONG_RUNNING_QUERIES.format(pid_column=self.pid_column, query_column=self.query_column, idle=idle),
         )
 
-    def seq_scans(self: Self) -> List[Tuple[Any, ...]]:
+    def seq_scans(self: Self) -> list[tuple[Any, ...]]:
         """Show the count of sequential scans by table descending by order.
 
         Record(     name='pgbench_branches',     count=237 )
@@ -292,7 +292,7 @@ class PgExtras:
         """
         return self.execute(sql.SEQ_SCANS)
 
-    def unused_indexes(self: Self) -> List[Tuple[Any, ...]]:
+    def unused_indexes(self: Self) -> list[tuple[Any, ...]]:
         """Show unused and almost unused indexes, ordered by their size.
 
         relative to the number of index scans. Exclude
@@ -310,7 +310,7 @@ class PgExtras:
         """
         return self.execute(sql.UNUSED_INDEXES)
 
-    def total_table_size(self: Self) -> List[Tuple[Any, ...]]:
+    def total_table_size(self: Self) -> list[tuple[Any, ...]]:
         """Show the size of the tables (including indexes), descending by size.
 
         Record(     name='pgbench_accounts',     size='15 MB' )
@@ -319,7 +319,7 @@ class PgExtras:
         """
         return self.execute(sql.TOTAL_TABLE_SIZE)
 
-    def total_indexes_size(self: Self) -> List[Tuple[Any, ...]]:
+    def total_indexes_size(self: Self) -> list[tuple[Any, ...]]:
         """Show the total size of all the indexes on each table, descending by size.
 
         Record(     table='pgbench_accounts',     index_size='2208 kB' )
@@ -328,21 +328,21 @@ class PgExtras:
         """
         return self.execute(sql.TOTAL_INDEXES_SIZE)
 
-    def table_size(self: Self) -> List[Tuple[Any, ...]]:
+    def table_size(self: Self) -> list[tuple[Any, ...]]:
         """Show the size of the tables (excluding indexes), descending by size.
 
         :returns: list
         """
         return self.execute(sql.TABLE_SIZE)
 
-    def index_size(self: Self) -> List[Tuple[Any, ...]]:
+    def index_size(self: Self) -> list[tuple[Any, ...]]:
         """Show the size of indexes, descending by size.
 
         :returns: list
         """
         return self.execute(sql.INDEX_SIZE)
 
-    def total_index_size(self: Self) -> List[Tuple[Any, ...]]:
+    def total_index_size(self: Self) -> list[tuple[Any, ...]]:
         """Show the total size of all indexes.
 
         Record(     size='2240 kB' )
@@ -351,7 +351,7 @@ class PgExtras:
         """
         return self.execute(sql.TOTAL_INDEX_SIZE)
 
-    def locks(self: Self) -> List[Tuple[Any, ...]]:
+    def locks(self: Self) -> list[tuple[Any, ...]]:
         """Display queries with active locks.
 
         Record(     procpid=31776,     relname=None,
@@ -362,7 +362,7 @@ class PgExtras:
         """
         return self.execute(sql.LOCKS.format(pid_column=self.pid_column, query_column=self.query_column))
 
-    def table_indexes_size(self: Self) -> List[Tuple[Any, ...]]:
+    def table_indexes_size(self: Self) -> list[tuple[Any, ...]]:
         """Show the total size of all the indexes on each table, descending by size.
 
         Record(     table='pgbench_accounts',     index_size='2208 kB' )
@@ -371,7 +371,7 @@ class PgExtras:
         """
         return self.execute(sql.TABLE_INDEXES_SIZE)
 
-    def ps(self: Self) -> List[Tuple[Any, ...]]:
+    def ps(self: Self) -> list[tuple[Any, ...]]:
         """View active queries with execution time.
 
         Record(     pid=28023,     source='pgbench', running_for=datetime.timedelta(0, 0, 288174),     waiting=0,
@@ -384,7 +384,7 @@ class PgExtras:
         query_column = self.truncate_query(column_name=self.query_column)
         return self.execute(sql.PS.format(pid_column=self.pid_column, query_column=query_column, idle=idle))
 
-    def version(self: Self) -> List[Tuple[Any, ...]]:
+    def version(self: Self) -> list[tuple[Any, ...]]:
         """Get the Postgres server version.
 
         Record(     version='PostgreSQL 9.3.3 on x86_64-apple- darwin13.0.0' )
