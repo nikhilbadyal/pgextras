@@ -1,7 +1,7 @@
 [tool.ruff]
 line-length = 120
 select = ["ALL"]
-target-version = "py311"
+target-version = "py310"
 ignore = [
     "D401", #First line of docstring should be in imperative mood
     "ANN401", #Any dissallowed

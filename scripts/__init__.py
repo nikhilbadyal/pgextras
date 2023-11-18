@@ -2,12 +2,13 @@
 import re
 from collections import namedtuple
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
 import psycopg2
 import psycopg2.extras
 from loguru import logger
 from packaging.version import parse as parse_version
+from typing_extensions import Self
 
 from . import sql_constants as sql
 
