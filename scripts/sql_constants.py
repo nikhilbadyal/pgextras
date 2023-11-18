@@ -44,7 +44,7 @@ VACUUM_STATS = """
     FROM
     pg_stat_user_tables psut INNER JOIN pg_class ON psut.relid = pg_class.oid
     INNER JOIN vacuum_settings ON pg_class.oid = vacuum_settings.oid
-    ORDER BY 1
+    ORDER BY psut.n_dead_tup desc ;
 """
 
 OUTLIERS = """
