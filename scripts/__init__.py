@@ -165,7 +165,7 @@ class PgExtras:
     def close_db_connection(self: Self) -> None:
         """Close database connection."""
         if self._cursor is not None:
-            self._cursor.close()  # type: ignore[no-untyped-call]
+            self._cursor.close()
 
         if self._conn is not None:
             self._conn.close()
