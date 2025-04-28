@@ -1,6 +1,5 @@
 """SQL statements are kept here as to not clutter up main file."""
 
-
 VACUUM_STATS = """
     WITH table_opts AS (
     SELECT

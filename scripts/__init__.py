@@ -1,4 +1,5 @@
 """Entrypoint."""
+
 import re
 from collections import namedtuple
 from types import TracebackType
