@@ -1,4 +1,4 @@
-Unofficial Python port of 's pgextras that provides various statistics for a Postgres instance. 
+Unofficial Python port of 's pgextras that provides various statistics for a Postgres instance.
 
 This may be useful when analyzing performance issues. This includes information
 about locks, index usage, buffer cache hit ratios and vacuum statistics.
