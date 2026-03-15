@@ -1,4 +1,4 @@
-#!/usr/bin/env python #noqa: D100
+#!/usr/bin/env python
 import argparse
 from typing import Any
 
