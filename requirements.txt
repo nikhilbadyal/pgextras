@@ -1,5 +1,5 @@
 loguru==0.7.3
-packaging==25.0
+packaging==26.2
 pre-commit==4.6.0
 prettytable==3.17.0
 psycopg2-binary==2.9.12
